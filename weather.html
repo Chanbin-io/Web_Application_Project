@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>오늘의 날씨</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --brand:#0b5fff;
+      --brand-2:#0d3b9b;
+      --bg:#f4f7fb;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --ok:#16a34a;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:'Noto Sans KR', system-ui, -apple-system, Segoe UI, Roboto, 'Apple SD Gothic Neo', '맑은 고딕', sans-serif;
+      background:var(--bg);
+      color:#0f172a;
+    }
+    header{
+      background:linear-gradient(135deg, var(--brand), var(--brand-2));
+      color:#fff;
+      padding:18px 22px;
+      position:sticky;
+      top:0;
+      z-index:10;
+      box-shadow:0 6px 18px rgba(11,95,255,.18);
+    }
+    header .row{display:flex; gap:14px; align-items:center; flex-wrap:wrap}
+    h1{font-size:20px; margin:0; font-weight:700; letter-spacing:.2px}
+    .subtitle{opacity:.9; font-weight:400; font-size:13px}
+    .search{
+      display:flex; gap:8px; align-items:center;
+      margin-left:auto; flex:1; max-width:560px;
+    }
+    .search input{
+      flex:1; padding:12px 14px; border-radius:12px; border:0; outline:none;
+      background:rgba(255,255,255,.95); font-size:14px;
+      box-shadow:inset 0 0 0 1px rgba(0,0,0,.05);
+    }
+    .btn{
+      background:#fff; color:var(--brand-2); border:0;
+      padding:12px 14px; border-radius:12px; font-weight:600; cursor:pointer;
+      box-shadow:0 4px 10px rgba(0,0,0,.08);
+    }
+    .btn:active{transform:translateY(1px)}
+    main{padding:22px; max-width:1200px; margin:0 auto}
+    .grid{
+      display:grid; grid-template-columns:1.2fr .8fr; gap:22px;
+    }
+    @media (max-width: 980px){ .grid{grid-template-columns:1fr} }
+    .card{
+      background:var(--card); border-radius:var(--radius);
+      box-shadow:0 8px 30px rgba(2,6,23,.06); overflow:hidden;
+    }
+    .card .head{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:14px 16px; border-bottom:1px solid #eef2f7;
+    }
+    .card .head h2{margin:0; font-size:15px}
+    .card .body{padding:16px}
+    .muted{color:var(--muted)}
+
+    .now-wrap{display:grid; grid-template-columns: 1fr 1fr; gap:14px}
+    @media (max-width: 640px){ .now-wrap{grid-template-columns:1fr} }
+    .now-main{display:flex; gap:14px; align-items:center}
+    .temp{font-size:54px; font-weight:700; letter-spacing:-1px}
+    .hi-lo{font-size:13px}
+
+    .kpis{
+      display:grid; grid-template-columns: repeat(3, 1fr);
+      gap:10px; margin-top:10px;
+    }
+    .kpi{background:#f8fafc; border-radius:12px; padding:12px}
+    .kpi .label{font-size:12px; color:var(--muted)}
+    .kpi .value{font-size:16px; font-weight:700; margin-top:4px}
+
+    .forecast-row{
+      display:grid;
+      grid-template-columns: repeat(8, minmax(90px,1fr));
+      gap:10px;
+    }
+    @media (max-width: 900px){
+      .forecast-row{grid-template-columns: repeat(4,minmax(90px,1fr))}
+    }
+    .slot{background:#f8fafc; border-radius:14px; padding:10px; text-align:center}
+    .slot .t{font-weight:700}
+    .slot .d{font-size:12px; color:var(--muted)}
+
+    .air{
+      display:grid; grid-template-columns: repeat(2, 1fr); gap:10px;
+    }
+    @media (max-width: 640px){ .air{grid-template-columns:1fr} }
+
+    .badge{display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700}
+    .b-ok{background:#e7f8ec; color:var(--ok)}
+    .b-warn{background:#fff4e5; color:var(--warn)}
+    .b-bad{background:#feecec; color:var(--bad)}
+
+    .footer{margin-top:26px; text-align:center; color:var(--muted); font-size:12px}
+    .loading{opacity:.6; animation:pulse 1.2s infinite}
+    @keyframes pulse{0%{opacity:.5} 50%{opacity:1} 100%{opacity:.5}}
+    .small{font-size:12px}
+    .right{display:flex; align-items:center; gap:10px}
+    .loc{font-weight:700}
+    .chip{background:#e0ebff; color:#103687; border-radius:999px; font-size:12px; padding:4px 8px}
+
+    canvas{width:100%; height:220px}
+    .legend{display:flex; gap:10px; align-items:center; font-size:12px; color:var(--muted); margin-top:4px}
+    .legend .dot{width:8px; height:8px; border-radius:999px; background:#0f172a; display:inline-block}
+
+    /* 오늘 시간별 아이콘/기온 (4×2 그리드) */
+    .hourly-wrap{
+      margin-top:18px;
+    }
+    .hourly-grid{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0,1fr));
+      gap:12px;
+      margin-top:8px;
+    }
+    .hour-card{
+      background:#f8fafc;
+      border-radius:14px;
+      padding:10px;
+      text-align:center;
+    }
+    .hour-card .time{font-size:12px; color:var(--muted); margin-bottom:4px}
+    .hour-card img{width:32px; height:32px; display:block; margin:0 auto 4px auto}
+    .hour-card .t{font-weight:700; font-size:15px}
+    .hour-card .d{font-size:11px; color:var(--muted)}
+
+    /* AI 요약/추천 컴포넌트 */
+    .ai-card .out{display:grid; grid-template-columns:1fr; gap:10px}
+    .ai-card .out .row{background:#f8fafc; border-radius:12px; padding:12px}
+    .ai-card .out .label{font-size:12px; color:var(--muted); margin-bottom:4px}
+    .ai-card .out .value{font-size:14px; white-space:pre-wrap}
+    .ai-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+    .ghost{background:#eef2ff; color:#0d3b9b}
+    .warn{background:#fff1f2; color:#be123c}
+
+    /* AI 외출 추천/준비물 */
+    .ai-extra{margin-top:20px; padding-top:14px; border-top:1px solid #eef2f7}
+    .ai-extra h3{font-size:14px; margin:0 0 8px 0}
+    .ai-extra p{font-size:14px; margin:6px 0; white-space:pre-wrap}
+    .ai-items{margin-top:12px}
+    .ai-items ul{background:#f8fafc; border-radius:12px; padding:12px; list-style:none; margin:0}
+    .ai-items li{margin-bottom:4px; font-size:13px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="row">
+      <div>
+        <h1>오늘의 날씨</h1>
+        <div class="subtitle">현재 위치 또는 도시 검색 · OpenWeatherMap 기반</div>
+      </div>
+      <div class="search">
+        <input id="q" placeholder="도시/지역 입력 (예: 전주, Seoul, Tokyo)" aria-label="도시 검색" />
+        <button class="btn" id="btnSearch">검색</button>
+        <button class="btn" id="btnGeo">내 위치</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="grid">
+
+      <!-- 좌측: 현재/시간별 -->
+      <section class="card" id="nowCard">
+        <div class="head">
+          <h2>현재 날씨</h2>
+          <div class="right">
+            <span class="chip" id="updated">업데이트…</span>
+            <span class="loc" id="place">-</span>
+          </div>
+        </div>
+        <div class="body">
+          <div class="now-wrap">
+            <div class="now-main">
+              <img id="nowIcon" alt="" width="80" height="80" />
+              <div>
+                <div class="temp"><span id="nowTemp" class="loading">--</span>°</div>
+                <div class="hi-lo muted">
+                  최고 <b id="hi">--</b>° / 최저 <b id="lo">--</b>° · <span id="desc">-</span>
+                </div>
+                <div class="small muted" id="sun">일출/일몰 —</div>
+              </div>
+            </div>
+            <div>
+              <div class="kpis">
+                <div class="kpi">
+                  <div class="label">체감</div>
+                  <div class="value" id="feels">--°</div>
+                </div>
+                <div class="kpi">
+                  <div class="label">습도</div>
+                  <div class="value" id="humidity">--%</div>
+                </div>
+                <div class="kpi">
+                  <div class="label">풍속</div>
+                  <div class="value" id="wind">-- m/s</div>
+                </div>
+                <div class="kpi">
+                  <div class="label">운량</div>
+                  <div class="value" id="clouds">--%</div>
+                </div>
+                <div class="kpi">
+                  <div class="label">기압</div>
+                  <div class="value" id="pressure">-- hPa</div>
+                </div>
+                <div class="kpi">
+                  <div class="label">가시거리</div>
+                  <div class="value" id="visibility">-- km</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 라인 차트 -->
+          <div style="margin-top:16px">
+            <div class="legend"><span class="dot"></span> 24시간 기온 (°C)</div>
+            <canvas id="hourlyChart" aria-label="24시간 기온 차트"></canvas>
+          </div>
+
+          <!-- 오늘 시간별 아이콘 · 기온 (4x2) -->
+          <div class="hourly-wrap">
+            <div class="legend">
+              <span class="dot"></span>
+              오늘 시간별 아이콘 · 기온
+            </div>
+            <div id="todayHourly" class="hourly-grid"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 우측: 공기질 & 시스템 정보 + AI 요약/추천 -->
+      <aside class="card ai-card">
+        <div class="head"><h2>대기질 · AI 날씨 요약 & 추천</h2></div>
+        <div class="body">
+          <div class="air">
+            <div class="kpi">
+              <div class="label">대기질 지수 (AQI)</div>
+              <div class="value" id="aqi">—</div>
+              <div id="aqiBadge" class="badge" style="margin-top:6px">-</div>
+            </div>
+            <div class="kpi">
+              <div class="label">PM2.5 / PM10</div>
+              <div class="value" id="pm">—</div>
+            </div>
+          </div>
+
+          <div style="margin-top:14px; border-top:1px solid #eef2f7; padding-top:14px">
+            <div class="out">
+              <div class="row">
+                <div class="label">한줄 코멘트</div>
+                <div class="value" id="aiLine">—</div>
+              </div>
+              <div class="row">
+                <div class="label">옷차림</div>
+                <div class="value" id="aiWear">—</div>
+              </div>
+              <div class="row">
+                <div class="label">활동</div>
+                <div class="value" id="aiAct">—</div>
+              </div>
+              <div class="row">
+                <div class="label">음식</div>
+                <div class="value" id="aiFood">—</div>
+              </div>
+            </div>
+            <div class="ai-actions">
+              <button class="btn ghost" id="btnRule">간단 코멘트(규칙 기반)</button>
+              <button class="btn" id="btnGPT">AI 코멘트 생성(GPT)</button>
+              <button class="btn warn" id="btnClear">초기화</button>
+            </div>
+
+            <!-- AI 외출 추천 -->
+            <div class="ai-extra">
+              <h3>AI 외출 추천 </h3>
+              <p id="aiActivity">—</p>
+              <button class="btn ghost" id="btnActivity">AI 외출 추천 생성</button>
+            </div>
+
+            <!-- AI 준비물 리스트 -->
+            <div class="ai-extra ai-items">
+              <h3>AI 준비물 리스트 </h3>
+              <button class="btn" id="btnItems">오늘 외출 준비물 보기</button>
+              <ul id="itemList" style="display:none;"></ul>
+            </div>
+
+            <details style="margin-top:8px">
+              <summary class="small"> </summary>
+<pre class="small" style="white-space:pre-wrap">
+// server.js (예시) — 환경변수 OPENAI_API_KEY 필요
+import express from 'express'
+import fetch from 'node-fetch'
+const app = express();
+app.use(express.json());
+
+app.post('/api/ai-comment', async (req, res)=>{
+  const { payload } = req.body;
+  try{
+    const r = await fetch('https://api.openai.com/v1/responses',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':`Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model:'gpt-4o-mini',
+        input: payload,
+        modalities:['text']
+      })
+    });
+    const j = await r.json();
+    const text =
+      j.output?.[0]?.content?.[0]?.text ||
+      j.choices?.[0]?.message?.content ||
+      '';
+    res.json({ ok:true, text });
+  }catch(e){
+    res.status(500).json({ ok:false, error: String(e) });
+  }
+});
+
+app.listen(3000, ()=>console.log('http://localhost:3000'));
+</pre>
+            </details>
+          </div>
+
+          <p class="small muted" style="margin-top:12px">
+            데이터 출처: OpenWeatherMap · 단위: 미터법 · 언어: 한국어
+          </p>
+        </div>
+      </aside>
+
+      <!-- 하단: 5일 예보 -->
+      <section class="card" style="grid-column:1 / -1">
+        <div class="head"><h2>5일 예보 (6시간 간격 요약)</h2></div>
+        <div class="body">
+          <div id="forecast" class="forecast-row"></div>
+        </div>
+      </section>
+
+    </div>
+
+    <div class="footer">
+      © 2025 Mini KMA-style Dashboard · 제작: 당신의 개인프로젝트
+    </div>
+  </main>
+
+  <!-- 메인: 날씨/예보/대기질 가져오기 -->
+  <script>
+    const API_KEY = 'e9808ce859f70cb113869dcafbdb897e';
+    const OWM = {
+      geo: (q) => `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(q)}&limit=1&appid=${API_KEY}`,
+      weather: (lat, lon) => `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&units=metric&lang=kr&appid=${API_KEY}`,
+      forecast: (lat, lon) => `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&units=metric&lang=kr&appid=${API_KEY}`,
+      air: (lat, lon) => `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${API_KEY}`
+    };
+
+    const $ = (s) => document.querySelector(s);
+    const q = $('#q');
+    const btnSearch = $('#btnSearch');
+    const btnGeo = $('#btnGeo');
+    const place = $('#place');
+    const updated = $('#updated');
+    const nowIcon = $('#nowIcon');
+    const nowTemp = $('#nowTemp');
+    const hi = $('#hi');
+    const lo = $('#lo');
+    const desc = $('#desc');
+    const feels = $('#feels');
+    const humidity = $('#humidity');
+    const wind = $('#wind');
+    const clouds = $('#clouds');
+    const pressure = $('#pressure');
+    const visibility = $('#visibility');
+    const sun = $('#sun');
+    const forecastWrap = $('#forecast');
+    const aqi = $('#aqi');
+    const aqiBadge = $('#aqiBadge');
+    const pm = $('#pm');
+    const hourlyCanvas = document.getElementById('hourlyChart');
+    const todayHourly = document.getElementById('todayHourly');
+    const ctx = hourlyCanvas.getContext('2d');
+
+    let hourlyChartData = [];
+
+    function fmtTime(ts, opts={}){
+      const d = new Date(ts*1000);
+      return d.toLocaleString('ko-KR', { hour:'2-digit', minute:'2-digit', ...opts});
+    }
+    function fmtDate(ts){
+      const d = new Date(ts*1000);
+      return d.toLocaleDateString('ko-KR', { month:'numeric', day:'numeric'});
+    }
+    function km(v){ return (v/1000).toFixed(1); }
+
+    function setAQIBadge(v){
+      let text='-'; let cls='b-ok';
+      if(v===1){ text='좋음'; cls='b-ok'; }
+      else if(v===2){ text='보통'; cls='b-ok'; }
+      else if(v===3){ text='민감군 주의'; cls='b-warn'; }
+      else if(v===4){ text='나쁨'; cls='b-warn'; }
+      else if(v===5){ text='매우 나쁨'; cls='b-bad'; }
+      aqiBadge.className = 'badge ' + cls;
+      aqiBadge.textContent = text;
+    }
+
+    function iconUrl(code){
+      return `https://openweathermap.org/img/wn/${code}@2x.png`;
+    }
+
+    function drawHourlyChart(points){
+      const W = hourlyCanvas.clientWidth;
+      const H = hourlyCanvas.clientHeight;
+      const DPR = Math.min(2, window.devicePixelRatio || 1);
+      hourlyCanvas.width = Math.floor(W * DPR);
+      hourlyCanvas.height = Math.floor(H * DPR);
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.scale(DPR, DPR);
+
+      ctx.clearRect(0, 0, W, H);
+      if(!points.length) return;
+
+      const temps = points.map(p=>p.t);
+      const min = Math.min(...temps) - 1;
+      const max = Math.max(...temps) + 1;
+      const pad = 18;
+
+      function x(i){ return pad + i*( (W-2*pad) / (points.length-1) ); }
+      function y(val){ return H - pad - ( (val-min)/(max-min) ) * (H-2*pad); }
+
+      // grid
+      ctx.strokeStyle = '#e5e7eb';
+      ctx.lineWidth = 1;
+      for(let g=0; g<4; g++){
+        const gy = pad + g*((H-2*pad)/3);
+        ctx.beginPath(); ctx.moveTo(pad, gy); ctx.lineTo(W-pad, gy); ctx.stroke();
+      }
+
+      // line
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      points.forEach((p,i)=>{
+        const X=x(i), Y=y(p.t);
+        if(i===0) ctx.moveTo(X,Y); else ctx.lineTo(X,Y);
+      });
+      ctx.stroke();
+
+      // points + labels
+      ctx.font = '12px "Noto Sans KR"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillStyle = '#0f172a';
+      points.forEach((p,i)=>{
+        const X=x(i), Y=y(p.t);
+        ctx.beginPath(); ctx.arc(X,Y,3,0,Math.PI*2); ctx.fill();
+        ctx.fillText(`${Math.round(p.t)}°`, X, Y-6);
+      });
+
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = '#6b7280';
+      points.forEach((p,i)=>{ if(i%3===0){ ctx.fillText(p.h, x(i), H-14); } });
+    }
+
+    async function fetchJSON(url){
+      const res = await fetch(url);
+      if(!res.ok){ throw new Error('요청 실패: '+res.status); }
+      return res.json();
+    }
+
+    async function loadByQuery(query){
+      updated.textContent = '조회 중…'; updated.classList.add('loading');
+      try{
+        const g = await fetchJSON(OWM.geo(query));
+        if(!g || !g.length) throw new Error('지역을 찾지 못했습니다.');
+        const {lat, lon, name, state, country} = g[0];
+        await loadAll(lat, lon, `${name}${state? ' '+state: ''}, ${country}`);
+      }catch(err){
+        alert('검색 실패: '+err.message);
+        updated.textContent = '실패'; updated.classList.remove('loading');
+      }
+    }
+
+    async function loadAll(lat, lon, label){
+      place.textContent = label || `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+      updated.textContent = '업데이트 중…'; updated.classList.add('loading');
+      try{
+        const [w, f, a] = await Promise.all([
+          fetchJSON(OWM.weather(lat, lon)),
+          fetchJSON(OWM.forecast(lat, lon)),
+          fetchJSON(OWM.air(lat, lon)).catch(()=>null)
+        ]);
+
+        /* 현재 */
+        nowIcon.src = iconUrl(w.weather?.[0]?.icon || '01d');
+        nowIcon.alt = w.weather?.[0]?.description || '';
+        nowTemp.textContent = Math.round(w.main.temp);
+        desc.textContent = w.weather?.[0]?.description || '-';
+        feels.textContent = Math.round(w.main.feels_like) + '°';
+        humidity.textContent = w.main.humidity + '%';
+        wind.textContent = (w.wind?.speed ?? 0).toFixed(1) + ' m/s';
+        clouds.textContent = (w.clouds?.all ?? 0) + '%';
+        pressure.textContent = w.main.pressure + ' hPa';
+        visibility.textContent = w.visibility ? km(w.visibility) + ' km' : '-';
+        sun.textContent = `일출 ${fmtTime(w.sys.sunrise)} · 일몰 ${fmtTime(w.sys.sunset)}`;
+
+
+        /* 시간별(24시간) */
+        const first8 = f.list.slice(0, 8); // 3시간 * 8 = 24시간
+
+        // 그래프 데이터 만들기
+        hourlyChartData = first8.map(x => ({
+          t: x.main.temp,
+          h: new Date(x.dt * 1000).toLocaleTimeString('ko-KR', { hour: '2-digit' })
+        }));
+        drawHourlyChart(hourlyChartData);
+
+        // 그래프에 쓰는 8개의 온도 기준으로 최고 / 최저 계산
+        const temps24 = first8.map(x => x.main.temp);
+
+        if (temps24.length > 0) {
+          const maxT = Math.max(...temps24);
+          const minT = Math.min(...temps24);
+
+          hi.textContent = Math.round(maxT);  
+          lo.textContent = Math.round(minT);  
+        } else {
+          // 혹시 데이터가 없으면 API 기본값으로
+          hi.textContent = Math.round(w.main.temp_max);
+          lo.textContent = Math.round(w.main.temp_min);
+        }
+
+        /* 오늘 시간별 카드 (4x2) */
+        todayHourly.innerHTML = '';
+        first8.forEach(item=>{
+          const div = document.createElement('div');
+          div.className = 'hour-card';
+          const timeStr = new Date(item.dt*1000)
+            .toLocaleTimeString('ko-KR',{hour:'2-digit', minute:'2-digit'});
+          div.innerHTML = `
+            <div class="time">${timeStr}</div>
+            <img src="${iconUrl(item.weather?.[0]?.icon||'01d')}" alt="">
+            <div class="t">${Math.round(item.main.temp)}°</div>
+            <div class="d">${item.weather?.[0]?.description||'-'}</div>
+          `;
+          todayHourly.appendChild(div);
+        });
+
+        /* 5일 예보 카드 */
+        forecastWrap.innerHTML = '';
+        f.list
+          .filter((_,i)=> i%2===0)
+          .slice(0, 16)
+          .forEach(item=>{
+            const d = document.createElement('div');
+            d.className='slot';
+            d.innerHTML = `
+              <div class="d">${fmtDate(item.dt)} ${new Date(item.dt*1000).toLocaleTimeString('ko-KR',{hour:'2-digit'})}</div>
+              <img src="${iconUrl(item.weather?.[0]?.icon||'01d')}" alt="" width="60" height="60"/>
+              <div class="t">${Math.round(item.main.temp)}°</div>
+              <div class="d">체감 ${Math.round(item.main.feels_like)}° · ${item.weather?.[0]?.description||'-'}</div>
+            `;
+            forecastWrap.appendChild(d);
+          });
+
+        /* 공기질 */
+        if(a && a.list && a.list[0]){
+          const A = a.list[0];
+          aqi.textContent = A.main.aqi;
+          setAQIBadge(A.main.aqi);
+          pm.textContent =
+            `${A.components.pm2_5?.toFixed(1)??'-'} / ${A.components.pm10?.toFixed(1)??'-'} µg/m³`;
+        }else{
+          aqi.textContent = '—';
+          aqiBadge.textContent='—';
+          aqiBadge.className='badge';
+          pm.textContent='—';
+        }
+
+        updated.textContent = new Date()
+          .toLocaleString('ko-KR',{hour:'2-digit', minute:'2-digit'})+' 갱신';
+        updated.classList.remove('loading');
+      }catch(err){
+        console.error(err);
+        updated.textContent = '실패';
+        updated.classList.remove('loading');
+        alert('데이터 로딩에 실패했습니다. API 키/요청 한도를 확인하세요.\n\n' + err.message);
+      }
+    }
+
+    /* 검색/위치 버튼 이벤트 */
+    btnSearch.addEventListener('click', ()=>{
+      if(q.value.trim()) loadByQuery(q.value.trim());
+    });
+    q.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter' && q.value.trim()) loadByQuery(q.value.trim());
+    });
+    btnGeo.addEventListener('click', ()=>{
+      if(!navigator.geolocation){
+        alert('이 브라우저는 위치 정보를 지원하지 않습니다.');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(pos=>{
+        const {latitude:lat, longitude:lon} = pos.coords;
+        loadAll(lat, lon, '내 위치');
+      }, err=>{
+        alert('위치 접근 실패: 권한을 허용해 주세요. 오류코드 '+err.code);
+      });
+    });
+
+    /* 초기 로드: 서울 */
+    window.addEventListener('load', ()=>{
+      loadByQuery('Seoul');
+    });
+
+    /* 리사이즈 시 차트 다시 그림 */
+    window.addEventListener('resize', ()=>{
+      if(hourlyChartData.length) drawHourlyChart(hourlyChartData);
+    });
+  </script>
+
+  <!-- 규칙 기반 / GPT 코멘트 -->
+  <script>
+    const rules = {
+      clear:{ line:'오늘은 하늘이 맑고 쾌청합니다. 나들이 가기 좋아요.', wear:'가벼운 상의, 선글라스', act:'공원 산책, 야외 촬영 추천', food:'샌드위치, 시원한 음료' },
+      clear_hot:{ line:'맑고 매우 덥습니다. 한낮 야외활동은 피하고 수분 보충하세요.', wear:'반팔, 모자, 자외선차단제', act:'그늘 휴식, 실내 스포츠 추천', food:'냉면·샐러드·수분 많은 과일' },
+      clouds:{ line:'구름이 많은 하루입니다. 간간이 해가 비칩니다.', wear:'얇은 겉옷 하나', act:'가벼운 산책, 드라이브', food:'브런치, 커피' },
+      overcast:{ line:'종일 흐린 하늘입니다. 기온 변화에 유의하세요.', wear:'긴팔 + 얇은 재킷', act:'실내 전시/영화 추천', food:'따뜻한 차, 수프' },
+      light_rain:{ line:'이른/늦은 시간대에 약한 비가 오겠습니다. 작은 우산을 챙기세요.', wear:'방수 얇은 점퍼, 방수 신발', act:'실내 카페·도서관', food:'어묵탕, 우동' },
+      rain:{ line:'비가 내립니다. 도로가 미끄러우니 조심하세요.', wear:'우산, 레인코트, 방수 운동화', act:'실내 활동 추천', food:'파전에 막걸리, 따끈한 찌개' },
+      shower:{ line:'국지성 소나기가 지나겠습니다. 짧은 소나기에 대비하세요.', wear:'접이식 우산, 빠른 건조 소재', act:'짧은 외출 시 레이더 확인', food:'뜨끈한 칼국수, 전통차' },
+      heavy_rain:{ line:'시간당 강한 비가 예상됩니다. 하천·저지대는 특히 주의하세요.', wear:'튼튼한 우산, 방수 부츠', act:'불필요한 외출 자제, 대중교통 이용', food:'따뜻한 국물요리, 가벼운 집밥' },
+      snow:{ line:'눈이 내립니다. 보행·운전 시 미끄럼 주의하세요.', wear:'패딩, 장갑, 방한화', act:'도보 이동 시 보폭 줄이기', food:'어묵탕, 호빵, 붕어빵' },
+      blizzard:{ line:'폭설이 예상됩니다. 교통 혼잡과 적설에 대비하세요.', wear:'방수 패딩, 방한 장갑/모자', act:'차량 체인·윈터타이어 점검', food:'뜨끈한 전골, 핫초코' },
+      sleet:{ line:'비와 눈이 섞여 내리겠습니다. 노면 결빙에 주의하세요.', wear:'방수 아우터, 미끄럼 방지 신발', act:'대중교통 권장', food:'국밥, 따뜻한 차' },
+      fog:{ line:'가시거리가 짧습니다. 운전 시 전조등을 켜고 속도를 줄이세요.', wear:'체온 유지용 가벼운 겉옷', act:'불필요한 장거리 운전 자제', food:'따뜻한 음료, 가벼운 식사' },
+      dust:{ line:'대기질이 나쁩니다. 외출 시 보건용 마스크를 착용하세요.', wear:'KF94 마스크, 안경/선글라스', act:'공기청정기, 실내 운동', food:'수분·비타민C 섭취' },
+      wind:{ line:'강한 바람이 붑니다. 간판·낙하물에 주의하세요.', wear:'바람막이, 모자 고정', act:'야외 활동 최소화', food:'따끈한 차, 든든한 식사' },
+      cold_wave:{ line:'강추위입니다. 노출 부위를 줄이고 보온에 신경 쓰세요.', wear:'히트텍, 목도리, 장갑, 방한화', act:'동파·저체온증 주의, 짧은 외출', food:'따뜻한 국물·찜, 생강차' },
+      heat_wave:{ line:'폭염이 이어집니다. 한낮 야외활동을 피하고 충분히 수분을 섭취하세요.', wear:'통풍 좋은 옷, 모자, 양산', act:'2~3시간마다 휴식, 전해질 보충', food:'수박·토마토·오이 등 수분 많은 음식' },
+      thunder:{ line:'천둥·번개가 예상됩니다. 야외 전력시설·수변 접근을 피하세요.', wear:'방수 아우터, 접이식 우산', act:'실내 대기, 금속제 시설물 근처 피하기', food:'따뜻한 차, 가벼운 간식' },
+      typhoon:{ line:'태풍 영향권입니다. 강풍·호우·해상 높은 파고에 각별히 주의하세요.', wear:'완전 방수, 미끄럼 방지 신발', act:'외출 자제, 비상식·휴대용 충전기 준비', food:'간편식, 따뜻한 국물' }
+    };
+
+    function classify({ main, desc, temp, wind, aqiNum, rain1h=0 }){
+      const m = (main||'').toLowerCase();
+      const d = (desc||'').toLowerCase();
+      if(aqiNum>=3) return 'dust';
+      if(m.includes('tornado') || d.includes('typhoon')) return 'typhoon';
+      if(m.includes('thunder')) return 'thunder';
+      if(wind>=14) return 'wind';
+      if(m.includes('snow')) return 'snow';
+      if(d.includes('blizzard')) return 'blizzard';
+      if(m.includes('sleet') || d.includes('rain and snow')) return 'sleet';
+      if(m.includes('rain')){
+        if(rain1h>=10) return 'heavy_rain';
+        if(rain1h>=2.5) return 'rain';
+        return 'light_rain';
+      }
+      if(m.includes('drizzle')) return 'light_rain';
+      if(m.includes('fog')||m.includes('haze')||m.includes('mist')) return 'fog';
+      if(m.includes('clouds')){
+        if(d.includes('overcast')) return 'overcast';
+        return 'clouds';
+      }
+      if(m.includes('clear')){
+        if(temp>=32) return 'clear_hot';
+        return 'clear';
+      }
+      if(temp<=-10) return 'cold_wave';
+      if(temp>=33) return 'heat_wave';
+      return 'clouds';
+    }
+
+    function fillAI(o){
+      document.getElementById('aiLine').textContent = o.line;
+      document.getElementById('aiWear').textContent = o.wear;
+      document.getElementById('aiAct').textContent = o.act;
+      document.getElementById('aiFood').textContent = o.food;
+    }
+    function clearAI(){ fillAI({line:'—', wear:'—', act:'—', food:'—'}); }
+
+    function buildPayload(){
+      const obj = {
+        place: document.getElementById('place').textContent,
+        temp: Number(document.getElementById('nowTemp').textContent)||null,
+        hi: Number(document.getElementById('hi').textContent)||null,
+        lo: Number(document.getElementById('lo').textContent)||null,
+        desc: document.getElementById('desc').textContent,
+        wind: parseFloat((document.getElementById('wind').textContent||'0').replace(' m/s',''))||0,
+        humidity: parseInt((document.getElementById('humidity').textContent||'0').replace('%',''))||0,
+        aqi: document.getElementById('aqi').textContent,
+        aqiBadge: document.getElementById('aqiBadge').textContent,
+      };
+      return `장소:${obj.place}, 현재기온:${obj.temp}°C(최고 ${obj.hi}, 최저 ${obj.lo}), 상태:${obj.desc}, 풍속:${obj.wind}m/s, 습도:${obj.humidity}%, AQI:${obj.aqi}(${obj.aqiBadge})`;
+    }
+
+    function runRule(){
+      const mainDesc = document.getElementById('desc').textContent || '';
+      const tempVal = Number(document.getElementById('nowTemp').textContent)||20;
+      const windVal = parseFloat((document.getElementById('wind').textContent||'0').replace(' m/s',''))||0;
+      const aqiNum = Number(document.getElementById('aqi').textContent)||1;
+      const key = classify({ main: mainDesc, desc: mainDesc, temp: tempVal, wind: windVal, aqiNum });
+      fillAI(rules[key]);
+    }
+
+    async function runGPT(){
+      const payload =
+`다음 날씨 정보를 바탕으로 한국어로 1) 한줄 코멘트, 2) 옷차림, 3) 활동, 4) 음식 추천을 간결히 제시하세요.
+${buildPayload()}
+형식: JSON {"line","wear","act","food"}`;
+      try{
+        const res = await fetch('/api/ai-comment',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ payload })
+        });
+        if(!res.ok) throw new Error('서버 응답 오류');
+        const data = await res.json();
+        const text = (data.text || '').trim();
+
+        let clean = text.replace(/```json/i, '').replace(/```/g, '').trim();
+        let parsed = null;
+        try { parsed = JSON.parse(clean); } catch (_) {}
+
+        if (parsed && parsed.line) {
+          fillAI(parsed);
+          return;
+        }
+
+        const m = {
+          line: (clean.match(/(한줄|한 줄|코멘트)[:\s]*([^\n]+)/)?.[2] || clean.split('\n')[0] || '—').trim(),
+          wear: clean.match(/옷차림[:\s]*([^\n]+)/)?.[1]?.trim() || '—',
+          act: clean.match(/활동[:\s]*([^\n]+)/)?.[1]?.trim() || '—',
+          food: clean.match(/음식[:\s]*([^\n]+)/)?.[1]?.trim() || '—'
+        };
+        fillAI(m);
+
+      }catch(e){
+        console.warn('GPT 호출 실패, 규칙 기반으로 대체', e);
+        runRule();
+      }
+    }
+
+    document.getElementById('btnRule').addEventListener('click', runRule);
+    document.getElementById('btnGPT').addEventListener('click', runGPT);
+    document.getElementById('btnClear').addEventListener('click', clearAI);
+  </script>
+
+  <!-- AI 외출 추천 + 준비물 -->
+  <script>
+    async function getAIActivitySuggestion() {
+      const city = document.getElementById('place').textContent;
+      const temp = Number(document.getElementById('nowTemp').textContent) || 20;
+      const humidityVal = Number(document.getElementById('humidity').textContent.replace('%','')) || 50;
+      const descText = document.getElementById('desc').textContent;
+      const aqiVal = document.getElementById('aqi').textContent;
+
+      const payload =
+`다음 정보를 바탕으로 오늘 날씨에 어울리는 외출 활동을 한국어로 1~2줄로 제안해줘. 따뜻한 말투, 이모지 1개 이내 사용.
+지역:${city}, 기온:${temp}°C, 습도:${humidityVal}%, 날씨:${descText}, AQI:${aqiVal}`;
+
+      try {
+        const r = await fetch('/api/ai-comment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payload })
+        });
+        const j = await r.json();
+
+        let clean = (j.text || '').replace(/```json/i, '').replace(/```/g, '').trim();
+        let parsed = null;
+        try { parsed = JSON.parse(clean); } catch (_) {}
+
+        let output = '';
+        if (parsed && parsed.line) {
+          output = parsed.line + (parsed.act ? '\n' + parsed.act : '');
+        } else {
+          output = clean;
+        }
+
+        document.getElementById('aiActivity').textContent = output || '추천 생성 실패';
+      } catch (e) {
+        document.getElementById('aiActivity').textContent =
+          'AI 추천 생성 실패. 네트워크를 확인하세요.';
+      }
+    }
+
+    /* 규칙 기반 기본 준비물 */
+    function getBasicItems(temp, desc){
+      const items=[];
+      if(desc.includes('비')||desc.toLowerCase().includes('rain')) items.push('우산');
+      if(temp < 5) items.push('두꺼운 코트');
+      else if(temp < 10) items.push('겉옷');
+      else if(temp > 25) items.push('반팔');
+      if(desc.includes('맑음') || desc.toLowerCase().includes('clear')){
+        if(temp >= 20) items.push('선글라스');
+        items.push('자외선차단제');
+      }
+      return [...new Set(items)];
+    }
+
+    /* GPT 기반 추가 준비물 (3~5개, 명사만) */
+    async function getAIItemsSuggestion(temp, desc, baseItems) {
+      const payload = `
+당신은 날씨 맞춤 준비물 도우미입니다.
+오늘 날씨 정보:
+- 상태: '${desc}'
+- 기온: ${temp}도
+- 기본 추천: [${baseItems}]
+
+요청 사항:
+1️⃣ 기본 추천과 중복되지 않는 "추가 준비물" 3~5개만 제안하세요.
+2️⃣ 반드시 명사만, 한 단어로만 제시하세요. (예: "장갑","핫팩","목도리")
+3️⃣ 감정, 설명, 문장, 인삿말, 온도 표현 금지.
+4️⃣ 반드시 JSON 형식으로만 출력하세요:
+{"items":["장갑","핫팩","목도리"]}
+`;
+
+      try {
+        const r = await fetch("/api/ai-comment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ payload }),
+        });
+        const j = await r.json();
+
+        let clean = (j.text || "")
+          .replace(/```json/i, "")
+          .replace(/```/g, "")
+          .replace(/\n/g, " ")
+          .trim();
+
+        let parsed = null;
+        try { parsed = JSON.parse(clean); } catch (_) {}
+
+        if (parsed && Array.isArray(parsed.items)) {
+          const unique = [...new Set(parsed.items)]
+            .filter(x => x && x.length >= 2 && x.length <= 8)
+            .slice(0, 5);
+          return unique.join(", ");
+        }
+
+        let items = clean
+          .replace(/[{}[\]"“”‘’]/g, " ")
+          .split(/[,·\n\/\s]+/)
+          .map(s => s.trim())
+          .filter(s =>
+            s &&
+            s.length >= 2 &&
+            s.length <= 8 &&
+            !/[다요하네음죠까겠을를은는가의]$/.test(s) &&
+            !/(맑|좋|따뜻|차가운|기분|느끼|오늘|함께|아름|행복|즐겁|밝|따스)/.test(s) &&
+            !/(입니다|하세요|해주세요|입어요)/.test(s)
+          );
+
+        const unique = [...new Set(items)].slice(0, 5);
+        return unique.length ? unique.join(", ") : "AI 제안 생성 실패";
+      } catch (e) {
+        console.error("AI 준비물 오류:", e);
+        return "AI 제안 생성 실패";
+      }
+    }
+
+    /* 버튼 이벤트: 준비물 / 외출 추천 */
+    document.getElementById('btnItems').addEventListener('click', async () => {
+      const ul = document.getElementById('itemList');
+      const temp = Number(document.getElementById('nowTemp').textContent) || 20;
+      const desc = document.getElementById('desc').textContent;
+
+      const basic = getBasicItems(temp, desc);
+      const ai = await getAIItemsSuggestion(temp, desc, basic.join(', '));
+
+      ul.style.display = 'block';
+      ul.innerHTML = `
+        <li><b>기본 추천:</b> ${basic.length ? basic.join(', ') : '상황에 맞는 기본 준비물이 없습니다.'}</li>
+        <li><b>AI 제안:</b> ${ai}</li>
+      `;
+    });
+
+    document.getElementById('btnActivity').addEventListener('click', getAIActivitySuggestion);
+  </script>
+</body>
+</html>
